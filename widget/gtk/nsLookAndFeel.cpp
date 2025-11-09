@@ -538,6 +538,37 @@ static bool GetColorFromImagePattern(const GValue* aValue, nscolor* aColor) {
   return false;
 }
 
+// Sets |aLightColor| and |aDarkColor| to colors from |aContext|.  Returns
+// true if |aContext| uses these colors to render a visible border.
+// If returning false, then the colors returned are a fallback from the
+// border-color value even though |aContext| does not use these colors to
+// render a border.
+static Maybe<nscolor> GetBorderColor(GtkStyleContext* aContext) {
+  // Determine whether the border on this style context is visible.
+  GtkStateFlags state = gtk_style_context_get_state(aContext);
+  GtkBorderStyle borderStyle = GTK_BORDER_STYLE_NONE;
+  gtk_style_context_get(aContext, state, GTK_STYLE_PROPERTY_BORDER_STYLE,
+                        &borderStyle, nullptr);
+  if (borderStyle == GTK_BORDER_STYLE_NONE ||
+                 borderStyle == GTK_BORDER_STYLE_HIDDEN) {
+    return {};
+  }
+  // GTK has an initial value of zero for border-widths, and so themes
+  // need to explicitly set border-widths to make borders visible.
+  GtkBorder border;
+  gtk_style_context_get_border(aContext, state, &border);
+  if (!border.top && !border.right && !border.bottom && !border.left) {
+    return {};
+  }
+
+  // The initial value for the border-color is the foreground color, and so
+  // this will usually return a color distinct from the background even if
+  // there is no visible border detected.
+  GdkRGBA color{};
+  gtk_style_context_get_border_color(aContext, state, &color);
+  return Some(GDK_RGBA_TO_NS_RGBA(color));
+}
+
 // Finds ideal cell highlight colors used for unfocused+selected cells distinct
 // from both Highlight, used as focused+selected background, and the listbox
 // background which is assumed to be similar to -moz-field
@@ -1797,17 +1828,19 @@ void nsLookAndFeel::InitializeGlobalSettings() {
     const ButtonLayout& layout = buttonLayout[i];
     int32_t* pos = nullptr;
     switch (layout.mType) {
-      case ButtonLayout::Type::Minimize:
+      case MOZ_GTK_HEADER_BAR_BUTTON_MINIMIZE:
         mCSDMinimizeButton = true;
         pos = &mCSDMinimizeButtonPosition;
         break;
-      case ButtonLayout::Type::Maximize:
+      case MOZ_GTK_HEADER_BAR_BUTTON_MAXIMIZE:
         mCSDMaximizeButton = true;
         pos = &mCSDMaximizeButtonPosition;
         break;
-      case ButtonLayout::Type::Close:
+      case MOZ_GTK_HEADER_BAR_BUTTON_CLOSE:
         mCSDCloseButton = true;
         pos = &mCSDCloseButtonPosition;
+        break;
+      default:
         break;
     }
 
