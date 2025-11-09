@@ -26,7 +26,6 @@
 #include "GLContext.h"
 #include "GSettings.h"
 #include "GtkCompositorWidget.h"
-#include "gtkdrawing.h"
 #include "imgIContainer.h"
 #include "InputData.h"
 #include "mozilla/Assertions.h"
